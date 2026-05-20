@@ -36,7 +36,7 @@ Este Código de Conducta se aplica en todos los espacios del proyecto (GitHub y 
 
 ## Aplicación y Reportes
 
-Los casos de comportamiento inaceptable, acosador o inapropiado pueden reportarse directamente a los administradores del proyecto enviando un correo privado a **jpscalero@outlook.com** o abriendo un reporte confidencial. Todos los reportes serán revisados e investigados de forma rápida y justa.
+Los casos de comportamiento inaceptable, acosador o inapropiado pueden reportarse directamente a los administradores del proyecto enviando un correo privado a **jpscalero@protonmail.com** o abriendo un reporte confidencial. Todos los reportes serán revisados e investigados de forma rápida y justa.
 
 Los administradores del proyecto se comprometen a respetar la privacidad y seguridad de quien reporte cualquier incidente.
 
