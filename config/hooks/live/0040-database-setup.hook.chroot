@@ -1,0 +1,128 @@
+#!/bin/bash
+# =====================================================================
+# ProtoSec OS 1.0 — Hook 0040: Configuración de Bases de Datos
+# =====================================================================
+set -e
+
+export DEBIAN_FRONTEND=noninteractive
+export HOME=/root
+export GOPATH=/opt/go
+export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
+
+echo "[ProtoSec] Iniciando Hook 0040 — Configuración de Bases de Datos..."
+
+# --- Directorio temporal para descargas ---
+mkdir -p /tmp/protosec-db-install
+cd /tmp/protosec-db-install
+
+# =====================================================================
+# SECCIÓN 1: Instalación de Motores de BD de Repositorios Oficiales
+# =====================================================================
+echo "[ProtoSec] Instalando MongoDB..."
+apt-get install -y mongodb-org || echo "[AVISO] No se pudo instalar mongodb-org."
+
+echo "[ProtoSec] Instalando Elasticsearch..."
+apt-get install -y elasticsearch || echo "[AVISO] No se pudo instalar elasticsearch."
+if [ -d /etc/elasticsearch ]; then
+    # Limitar el consumo de memoria heap de Elasticsearch a 512MB
+    mkdir -p /etc/elasticsearch/jvm.options.d
+    echo "-Xms512m" > /etc/elasticsearch/jvm.options.d/memory.options
+    echo "-Xmx512m" >> /etc/elasticsearch/jvm.options.d/memory.options
+fi
+
+echo "[ProtoSec] Instalando pgAdmin4 Desktop..."
+apt-get install -y pgadmin4-desktop || echo "[AVISO] No se pudo instalar pgadmin4-desktop."
+
+# =====================================================================
+# SECCIÓN 2: Clientes de BD desde GitHub y Binarios
+# =====================================================================
+echo "[ProtoSec] Descargando e instalando DBeaver CE..."
+wget -q https://dbeaver.io/files/dbeaver-ce_latest_amd64.deb -O dbeaver.deb || true
+if [ -f dbeaver.deb ]; then
+    dpkg -i dbeaver.deb 2>/dev/null || apt-get install -f -y || true
+    rm -f dbeaver.deb
+fi
+
+echo "[ProtoSec] Descargando e instalando MongoDB Compass..."
+wget -q "https://downloads.mongodb.com/compass/mongodb-compass_1.42.2_amd64.deb" -O compass.deb || true
+if [ -f compass.deb ]; then
+    dpkg -i compass.deb 2>/dev/null || apt-get install -f -y || true
+    rm -f compass.deb
+fi
+
+# RedisInsight
+echo "[ProtoSec] Creando instalador de RedisInsight..."
+cat > /usr/local/bin/instalar-redisinsight << 'REDISINEOF'
+#!/bin/bash
+# Asistente para la preparación de RedisInsight
+echo "=================================================="
+echo "          Instalador de RedisInsight              "
+echo "=================================================="
+echo ""
+echo "RedisInsight requiere descarga manual debido a su tamaño y licencia."
+echo "Puedes descargarlo en formato AppImage o .deb oficial de:"
+echo "  https://redis.com/redis-enterprise-software/redisinsight/"
+echo ""
+echo "Si descargas el AppImage, hazlo ejecutable y ejecútalo:"
+echo "  chmod +x RedisInsight-*.AppImage"
+echo "  ./RedisInsight-*.AppImage"
+echo ""
+REDISINEOF
+chmod +x /usr/local/bin/instalar-redisinsight
+
+# Instalar usql (cliente SQL universal en CLI)
+echo "[ProtoSec] Instalando cliente CLI usql..."
+if command -v go &>/dev/null; then
+    go install github.com/xo/usql@latest 2>/dev/null || echo "[AVISO] Falló la instalación de usql mediante Go."
+    [ -f $GOPATH/bin/usql ] && cp $GOPATH/bin/usql /usr/local/bin/ || true
+else
+    # Fallback binario si go no estuviera o fallara
+    USQL_VERSION="0.17.5"
+    wget -q "https://github.com/xo/usql/releases/download/v${USQL_VERSION}/usql-${USQL_VERSION}-linux-amd64.tar.bz2" -O usql.tar.bz2 || true
+    if [ -f usql.tar.bz2 ]; then
+        tar xjf usql.tar.bz2 usql || true
+        [ -f usql ] && mv usql /usr/local/bin/ && chmod +x /usr/local/bin/usql || true
+        rm -f usql.tar.bz2
+    fi
+fi
+
+# =====================================================================
+# SECCIÓN 3: Configuración de Parámetros de BD por Defecto
+# =====================================================================
+echo "[ProtoSec] Aplicando configuraciones de seguridad iniciales a las BD..."
+
+# PostgreSQL — Permitir conexiones seguras locales por defecto
+if [ -d /etc/postgresql ]; then
+    PG_VERSION=$(ls /etc/postgresql/ 2>/dev/null | head -1)
+    if [ -n "$PG_VERSION" ]; then
+        PG_HBA="/etc/postgresql/${PG_VERSION}/main/pg_hba.conf"
+        if [ -f "${PG_HBA}" ]; then
+            # Configurar pg_hba.conf para permitir md5 y local trust de forma controlada
+            sed -i 's/peer/trust/g' "${PG_HBA}"
+            sed -i 's/ident/trust/g' "${PG_HBA}"
+        fi
+    fi
+fi
+
+# Redis — Habilitar enlaces seguros locales
+if [ -f /etc/redis/redis.conf ]; then
+    sed -i 's/^bind .*/bind 127.0.0.1/g' /etc/redis/redis.conf
+fi
+
+# =====================================================================
+# SECCIÓN 4: Deshabilitación de Servicios del Arranque
+# =====================================================================
+echo "[ProtoSec] Desactivando el arranque automático de bases de datos para optimizar recursos..."
+for svc in mariadb postgresql redis-server mongod elasticsearch; do
+    if systemctl list-unit-files | grep -q "^${svc}.service"; then
+        systemctl disable "${svc}" || true
+    fi
+done
+
+# Limpieza
+cd /
+rm -rf /tmp/protosec-db-install
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+
+echo "[ProtoSec] Hook 0040 completado exitosamente."

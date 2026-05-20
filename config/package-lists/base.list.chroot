@@ -1,0 +1,86 @@
+# ============================================
+# ProtoSec OS 1.0 — Paquetes Base del Sistema
+# ============================================
+# Esta lista contiene los paquetes fundamentales
+# para el funcionamiento del sistema operativo.
+# ============================================
+
+# --- Utilidades esenciales del sistema ---
+sudo
+curl
+wget
+git
+vim
+nano
+htop
+btop
+neofetch
+
+# --- Shells y emuladores de terminal ---
+zsh
+zsh-autosuggestions
+zsh-syntax-highlighting
+bash-completion
+tmux
+screen
+
+# --- Utilidades de archivos y compresión ---
+tree
+unzip
+zip
+p7zip-full
+p7zip-rar
+
+# --- Herramientas de red básicas ---
+net-tools
+iproute2
+iputils-ping
+traceroute
+dnsutils
+whois
+
+# --- Servidor y cliente SSH ---
+openssh-client
+openssh-server
+
+# --- Compilación y desarrollo ---
+build-essential
+gcc
+g++
+make
+cmake
+python3
+python3-pip
+python3-venv
+perl
+ruby
+golang-go
+
+# --- Herramientas de depuración ---
+lsof
+strace
+ltrace
+gdb
+
+# --- Sincronización y transferencia ---
+rsync
+rclone
+
+# --- Tareas programadas y mantenimiento ---
+cron
+at
+logrotate
+
+# --- Seguridad base del sistema ---
+ufw
+fail2ban
+ca-certificates
+gnupg2
+apt-transport-https
+
+# --- Sistema y localización ---
+locales
+console-setup
+keyboard-configuration
+systemd-timesyncd
+dbus-x11

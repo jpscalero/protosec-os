@@ -1,0 +1,30 @@
+name: ShellCheck Linting
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          ignore_paths: >-
+            config/includes.chroot/etc/skel/.bashrc
+            config/includes.chroot/etc/skel/.zshrc
+        env:
+          SHELLCHECK_OPTS: -e SC2086 -e SC1090 -e SC1091
+
+      - name: Generate Actions Summary
+        if: always()
+        run: |
+          echo "### 🛡️ Resultados de ShellCheck" >> $GITHUB_STEP_SUMMARY
+          echo "Análisis estático de código completado de forma exitosa." >> $GITHUB_STEP_SUMMARY

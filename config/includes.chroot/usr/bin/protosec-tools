@@ -1,0 +1,326 @@
+#!/bin/bash
+# =====================================================================
+# ProtoSec OS 1.0 — Menú de Herramientas Interactivo (protosec-tools)
+# =====================================================================
+
+# Verificar que whiptail está instalado
+if ! command -v whiptail &>/dev/null; then
+    echo "Error: whiptail no está instalado. Por favor instálalo."
+    exit 1
+fi
+
+# Colores ProtoSec (Fondo negro, texto verde fosforito)
+export NEWT_COLORS='
+root=green,black
+window=black,green
+border=green,black
+shadow=black,black
+button=black,green
+actbutton=green,black
+checkbox=green,black
+actcheckbox=black,green
+entry=black,green
+listbox=green,black
+actlistbox=black,green
+textbox=green,black
+acttextbox=black,green
+'
+
+ejecutar_cli() {
+    clear
+    echo -e "\e[0;32m=================================================="
+    echo " ProtoSec OS — Ejecutando: $1"
+    echo -e "==================================================\e[0m"
+    echo ""
+    eval "$2"
+    echo ""
+    echo -e "\e[0;33mPresiona ENTER para regresar al menú...\e[0m"
+    read -r
+}
+
+ejecutar_gui() {
+    eval "$1" &>/dev/null &
+    whiptail --title "ProtoSec OS" --msgbox "Se ha lanzado '$1' en segundo plano." 8 45
+}
+
+# --- SUBMENÚ: Pentesting ---
+menu_pentesting() {
+    while true; do
+        OPCION=$(whiptail --title " ProtoSec OS — Pentesting " --menu "Selecciona una categoría de herramientas:" 18 60 10 \
+            "1" "Reconocimiento (Nmap, Masscan, Subfinder...)" \
+            "2" "Análisis de Vulnerabilidades (Nikto, Sqlmap...)" \
+            "3" "Explotación (Metasploit, Searchsploit...)" \
+            "4" "Post-Explotación (Chisel, Ligolo, WinRM...)" \
+            "5" "Ataques Web (Gobuster, FFuf, Feroxbuster...)" \
+            "6" "Wireless (Aircrack-ng, Wifite, Kismet...)" \
+            "7" "Análisis Forense (Binwalk, Ghidra, Volatility...)" \
+            "8" "Ataques de Contraseña (John, Hashcat, Hydra...)" \
+            "9" "OSINT (Sherlock, PhoneInfoga, Recon-ng...)" \
+            "10" "Sniffing / MitM (Wireshark, Bettercap...)" \
+            "B" "Volver al Menú Principal" 3>&1 1>&2 2>&3)
+
+        case "$OPCION" in
+            1)
+                HERR=$(whiptail --title "Reconocimiento" --menu "Selecciona una herramienta:" 15 60 5 \
+                    "NMAP" "Escaneo de puertos estándar (Nmap)" \
+                    "NMAP_FULL" "Escaneo completo intensivo (Nmap + vuln)" \
+                    "MASSCAN" "Escáner masivo de puertos rápidos" \
+                    "SUBFINDER" "Descubrimiento de subdominios" \
+                    "THEHARVESTER" "Recolección de información OSINT pasiva" 3>&1 1>&2 2>&3)
+                case "$HERR" in
+                    NMAP) ejecutar_cli "Nmap" "read -p 'Introduce IP/Host: ' ip && sudo nmap -sV -sC -O \$ip" ;;
+                    NMAP_FULL) ejecutar_cli "Nmap Completo" "read -p 'Introduce IP/Host: ' ip && sudo nmap -sV -sC -O -A -T4 --script=default,vuln \$ip" ;;
+                    MASSCAN) ejecutar_cli "Masscan" "read -p 'Rango IP/IP: ' ip && read -p 'Puertos: ' pt && sudo masscan -p\$pt \$ip --rate=1000" ;;
+                    SUBFINDER) ejecutar_cli "Subfinder" "read -p 'Dominio: ' dom && subfinder -d \$dom" ;;
+                    THEHARVESTER) ejecutar_cli "theHarvester" "read -p 'Dominio: ' dom && theHarvester -d \$dom -l 500 -b all" ;;
+                esac
+                ;;
+            2)
+                HERR=$(whiptail --title "Análisis de Vulnerabilidades" --menu "Selecciona una herramienta:" 12 60 3 \
+                    "NIKTO" "Escáner de vulnerabilidades de servidores web" \
+                    "SQLMAP" "Explotación automatizada de inyección SQL" \
+                    "LYNIS" "Auditoría de seguridad del sistema local" 3>&1 1>&2 2>&3)
+                case "$HERR" in
+                    NIKTO) ejecutar_cli "Nikto" "read -p 'URL/IP: ' url && nikto -h \$url" ;;
+                    SQLMAP) ejecutar_cli "Sqlmap" "read -p 'URL vulnerable: ' url && sqlmap -u \$url --batch --dbs" ;;
+                    LYNIS) ejecutar_cli "Lynis" "sudo lynis audit system" ;;
+                esac
+                ;;
+            3)
+                HERR=$(whiptail --title "Explotación" --menu "Selecciona una herramienta:" 12 60 3 \
+                    "MSF" "Metasploit Framework Console" \
+                    "SEARCHSPLOIT" "Búsqueda local en base de datos Exploit-DB" 3>&1 1>&2 2>&3)
+                case "$HERR" in
+                    MSF) ejecutar_cli "Metasploit" "sudo msfconsole" ;;
+                    SEARCHSPLOIT) ejecutar_cli "Searchsploit" "read -p 'Término de búsqueda: ' term && searchsploit \$term" ;;
+                esac
+                ;;
+            4)
+                HERR=$(whiptail --title "Post-Explotación" --menu "Selecciona una herramienta:" 12 60 3 \
+                    "WINRM" "Evil-WinRM (Shell remota PowerShell)" \
+                    "CHISEL_SRV" "Iniciar Servidor Chisel (Túneles)" \
+                    "LIGOLO_SRV" "Iniciar Proxy Ligolo-ng" 3>&1 1>&2 2>&3)
+                case "$HERR" in
+                    WINRM) ejecutar_cli "Evil-WinRM" "read -p 'IP: ' ip && read -p 'Usuario: ' user && read -s -p 'Password: ' pass && echo '' && evil-winrm -i \$ip -u \$user -p \$pass" ;;
+                    CHISEL_SRV) ejecutar_cli "Chisel Server" "chisel server --port 8080 --reverse" ;;
+                    LIGOLO_SRV) ejecutar_cli "Ligolo proxy" "ligolo-proxy -selfcert" ;;
+                esac
+                ;;
+            5)
+                HERR=$(whiptail --title "Ataques Web" --menu "Selecciona una herramienta:" 15 60 5 \
+                    "GOBUSTER" "Descubrimiento de directorios (Gobuster)" \
+                    "FEROX" "Fuzzing recursivo (Feroxbuster)" \
+                    "FFUF" "Fuzzing web rápido (FFuf)" \
+                    "ZAP" "OWASP ZAP (Fuzzer/Proxy Gráfico)" \
+                    "WAFW00F" "Detección de Firewalls Web (WAF)" 3>&1 1>&2 2>&3)
+                case "$HERR" in
+                    GOBUSTER) ejecutar_cli "Gobuster" "read -p 'URL: ' url && read -p 'Ruta Diccionario: ' dict && gobuster dir -u \$url -w \${dict:-/usr/share/wordlists/rockyou.txt} -t 30" ;;
+                    FEROX) ejecutar_cli "Feroxbuster" "read -p 'URL: ' url && feroxbuster -u \$url" ;;
+                    FFUF) ejecutar_cli "FFuf" "read -p 'URL (con palabra FUZZ): ' url && ffuf -u \$url -w /usr/share/wordlists/rockyou.txt" ;;
+                    ZAP) ejecutar_gui "zaproxy" ;;
+                    WAFW00F) ejecutar_cli "Wafw00f" "read -p 'URL: ' url && wafw00f \$url" ;;
+                esac
+                ;;
+            6)
+                HERR=$(whiptail --title "Ataques Wireless" --menu "Selecciona una herramienta:" 12 60 3 \
+                    "WIFITE" "Herramienta automatizada de ataque Wi-Fi" \
+                    "KISMET" "Sniffer y detector inalámbrico de red" \
+                    "MONITOR" "Habilitar/Deshabilitar modo monitor" 3>&1 1>&2 2>&3)
+                case "$HERR" in
+                    WIFITE) ejecutar_cli "Wifite" "sudo wifite" ;;
+                    KISMET) ejecutar_cli "Kismet" "kismet" ;;
+                    MONITOR) ejecutar_cli "Modo Monitor" "sudo airmon-ng" ;;
+                esac
+                ;;
+            7)
+                HERR=$(whiptail --title "Análisis Forense" --menu "Selecciona una herramienta:" 15 60 5 \
+                    "BINWALK" "Análisis y extracción de archivos embebidos" \
+                    "FOREMOST" "Recuperación forense de archivos basados en cabeceras" \
+                    "VOLATILITY" "Análisis de volcados de memoria (Volatility 3)" \
+                    "GHIDRA" "Ingeniería Inversa / Descompilador (NSA Ghidra)" \
+                    "RADARE" "Radare2 Framework de Ingeniería Inversa" 3>&1 1>&2 2>&3)
+                case "$HERR" in
+                    BINWALK) ejecutar_cli "Binwalk" "read -p 'Fichero: ' file && binwalk \$file" ;;
+                    FOREMOST) ejecutar_cli "Foremost" "read -p 'Imagen de disco: ' img && sudo foremost -i \$img -o /tmp/foremost-out" ;;
+                    VOLATILITY) ejecutar_cli "Volatility 3" "read -p 'Fichero de memoria: ' mem && python3 /usr/bin/vol3 -f \$mem windows.info" ;;
+                    GHIDRA) ejecutar_gui "ghidra" ;;
+                    RADARE) ejecutar_cli "Radare2" "read -p 'Binario: ' bin && r2 \$bin" ;;
+                esac
+                ;;
+            8)
+                HERR=$(whiptail --title "Ataques de Contraseña" --menu "Selecciona una herramienta:" 12 60 3 \
+                    "JOHN" "Craqueo de contraseñas offline (John the Ripper)" \
+                    "HASHCAT" "Craqueo de hashes avanzado por GPU/CPU" \
+                    "HYDRA" "Ataque de diccionario online por fuerza bruta" 3>&1 1>&2 2>&3)
+                case "$HERR" in
+                    JOHN) ejecutar_cli "John the Ripper" "read -p 'Fichero de hashes: ' file && john \$file" ;;
+                    HASHCAT) ejecutar_cli "Hashcat" "hashcat --help" ;;
+                    HYDRA) ejecutar_cli "Hydra" "read -p 'Servicio (ej: ssh/ftp): ' srv && read -p 'IP: ' ip && read -p 'Usuario: ' user && hydra -l \$user -P /usr/share/wordlists/rockyou.txt \$ip \$srv" ;;
+                esac
+                ;;
+            9)
+                HERR=$(whiptail --title "OSINT" --menu "Selecciona una herramienta:" 12 60 3 \
+                    "SHERLOCK" "Búsqueda de usuarios en redes sociales" \
+                    "PHONE" "PhoneInfoga OSINT para números telefónicos" \
+                    "RECON" "Recon-ng OSINT Framework" 3>&1 1>&2 2>&3)
+                case "$HERR" in
+                    SHERLOCK) ejecutar_cli "Sherlock" "read -p 'Nombre de usuario: ' user && sherlock \$user" ;;
+                    PHONE) ejecutar_cli "PhoneInfoga" "read -p 'Número (+34600000000): ' num && phoneinfoga scan -n \$num" ;;
+                    RECON) ejecutar_cli "Recon-ng" "recon-ng" ;;
+                esac
+                ;;
+            10)
+                HERR=$(whiptail --title "Sniffing / MitM" --menu "Selecciona una herramienta:" 15 60 4 \
+                    "WIRESHARK" "Analizador de protocolos Wireshark" \
+                    "TCPDUMP" "Capturador de red clásico por terminal" \
+                    "BETTERCAP" "Bettercap Network Attacks Framework" \
+                    "MITMPROXY" "Intercepción de tráfico HTTP/HTTPS" 3>&1 1>&2 2>&3)
+                case "$HERR" in
+                    WIRESHARK) ejecutar_gui "wireshark" ;;
+                    TCPDUMP) ejecutar_cli "Tcpdump" "read -p 'Interfaz: ' int && sudo tcpdump -i \$int -n" ;;
+                    BETTERCAP) ejecutar_cli "Bettercap" "read -p 'Interfaz: ' int && sudo bettercap -iface \$int" ;;
+                    MITMPROXY) ejecutar_cli "Mitmproxy" "mitmproxy" ;;
+                esac
+                ;;
+            "B"|*)
+                break
+                ;;
+        esac
+    done
+}
+
+# --- SUBMENÚ: Bases de Datos ---
+menu_databases() {
+    while true; do
+        OPCION=$(whiptail --title " ProtoSec OS — Bases de Datos " --menu "Gestión y clientes de Bases de Datos:" 18 60 10 \
+            "1" "Iniciar servicio MariaDB" \
+            "2" "Parar servicio MariaDB" \
+            "3" "Iniciar servicio PostgreSQL" \
+            "4" "Parar servicio PostgreSQL" \
+            "5" "Iniciar servicio MongoDB" \
+            "6" "Parar servicio MongoDB" \
+            "7" "Cliente CLI MySQL (mycli)" \
+            "8" "Cliente CLI PostgreSQL (pgcli)" \
+            "9" "Cliente Gráfico DBeaver CE" \
+            "10" "MongoDB Compass" \
+            "11" "Estado global de base de datos" \
+            "B" "Volver al Menú Principal" 3>&1 1>&2 2>&3)
+
+        case "$OPCION" in
+            1) sudo systemctl start mariadb && whiptail --msgbox "Servicio MariaDB Iniciado." 8 40 ;;
+            2) sudo systemctl stop mariadb && whiptail --msgbox "Servicio MariaDB Parado." 8 40 ;;
+            3) sudo systemctl start postgresql && whiptail --msgbox "Servicio PostgreSQL Iniciado." 8 40 ;;
+            4) sudo systemctl stop postgresql && whiptail --msgbox "Servicio PostgreSQL Parado." 8 40 ;;
+            5) sudo systemctl start mongod && whiptail --msgbox "Servicio MongoDB Iniciado." 8 40 ;;
+            6) sudo systemctl stop mongod && whiptail --msgbox "Servicio MongoDB Parado." 8 40 ;;
+            7) ejecutar_cli "mycli" "read -p 'Usuario: ' user && mycli -u \$user" ;;
+            8) ejecutar_cli "pgcli" "read -p 'Usuario: ' user && pgcli -U \$user" ;;
+            9) ejecutar_gui "dbeaver-ce" ;;
+            10) ejecutar_gui "mongodb-compass" ;;
+            11)
+                ESTADO=$(echo "=== ESTADO DE BASES DE DATOS ==="; for svc in mariadb postgresql redis-server mongod elasticsearch; do printf "%-15s: %s\n" "$svc" "$(systemctl is-active $svc 2>/dev/null || echo "inactivo")"; done)
+                whiptail --title "Estado de Servicios" --msgbox "$ESTADO" 15 50
+                ;;
+            "B"|*)
+                break
+                ;;
+        esac
+    done
+}
+
+# --- SUBMENÚ: Servidores ---
+menu_server() {
+    while true; do
+        OPCION=$(whiptail --title " ProtoSec OS — Servidores " --menu "Gestión de Servidores y Servicios:" 18 60 10 \
+            "1" "Iniciar/Parar Nginx" \
+            "2" "Iniciar/Parar Apache2" \
+            "3" "Iniciar/Parar Docker Daemon" \
+            "4" "Docker: Ver contenedores activos" \
+            "5" "Docker: Ver imágenes descargadas" \
+            "6" "Monitorización en tiempo real (btop)" \
+            "7" "Activar VPN WireGuard" \
+            "8" "Desactivar VPN WireGuard" \
+            "9" "Cockpit Panel (Abrir navegador)" \
+            "B" "Volver al Menú Principal" 3>&1 1>&2 2>&3)
+
+        case "$OPCION" in
+            1)
+                if systemctl is-active nginx &>/dev/null; then
+                    sudo systemctl stop nginx && whiptail --msgbox "Servicio Nginx Parado." 8 40
+                else
+                    sudo systemctl start nginx && whiptail --msgbox "Servicio Nginx Iniciado." 8 40
+                fi
+                ;;
+            2)
+                if systemctl is-active apache2 &>/dev/null; then
+                    sudo systemctl stop apache2 && whiptail --msgbox "Servicio Apache2 Parado." 8 40
+                else
+                    sudo systemctl start apache2 && whiptail --msgbox "Servicio Apache2 Iniciado." 8 40
+                fi
+                ;;
+            3)
+                if systemctl is-active docker &>/dev/null; then
+                    sudo systemctl stop docker && whiptail --msgbox "Docker Daemon Parado." 8 40
+                else
+                    sudo systemctl start docker && whiptail --msgbox "Docker Daemon Iniciado." 8 40
+                fi
+                ;;
+            4) ejecutar_cli "Docker Containers" "sudo docker ps -a" ;;
+            5) ejecutar_cli "Docker Images" "sudo docker images" ;;
+            6) ejecutar_cli "btop" "btop" ;;
+            7) ejecutar_cli "WireGuard UP" "read -p 'Nombre interfaz (ej. wg0): ' int && sudo wg-quick up \$int" ;;
+            8) ejecutar_cli "WireGuard DOWN" "read -p 'Nombre interfaz (ej. wg0): ' int && sudo wg-quick down \$int" ;;
+            9) ejecutar_gui "xdg-open http://localhost:9090" ;;
+            "B"|*)
+                break
+                ;;
+        esac
+    done
+}
+
+# --- SUBMENÚ: Información del Sistema ---
+menu_info() {
+    while true; do
+        OPCION=$(whiptail --title " Información del Sistema " --menu "Selecciona una utilidad de información:" 16 60 8 \
+            "1" "Branding / Resumen del sistema (fastfetch)" \
+            "2" "Espacio en Disco (df -h)" \
+            "3" "Uso de Memoria RAM (free -m)" \
+            "4" "Puertos locales en escucha (ss -tlnp)" \
+            "5" "Direcciones IP (Local y Pública)" \
+            "6" "Logs del sistema en vivo (journalctl)" \
+            "B" "Volver al Menú Principal" 3>&1 1>&2 2>&3)
+
+        case "$OPCION" in
+            1) ejecutar_cli "fastfetch" "fastfetch || neofetch" ;;
+            2) ejecutar_cli "Espacio en Disco" "df -h" ;;
+            3) ejecutar_cli "Uso de RAM" "free -h" ;;
+            4) ejecutar_cli "Puertos Activos" "sudo ss -tlnp" ;;
+            5) ejecutar_cli "Direcciones IP" "echo -e 'IP LOCAL:\n' && ip -brief addr && echo -e '\nIP PÚBLICA:\n' && curl -s ifconfig.me && echo ''" ;;
+            6) ejecutar_cli "Logs de Sistema" "sudo journalctl -n 50 --no-pager" ;;
+            "B"|*)
+                break
+                ;;
+        esac
+    done
+}
+
+# --- BUCLE PRINCIPAL ---
+while true; do
+    OPCION_PRINCIPAL=$(whiptail --title " ProtoSec OS 1.0 — Menú de Herramientas " --menu "Panel principal de control y lanzamiento:" 15 60 5 \
+        "1" "Herramientas de Pentesting" \
+        "2" "Gestión y Clientes de Bases de Datos" \
+        "3" "Gestión de Servidores y VPN" \
+        "4" "Información y Logs del Sistema" \
+        "5" "Salir al Intérprete" 3>&1 1>&2 2>&3)
+
+    case "$OPCION_PRINCIPAL" in
+        1) menu_pentesting ;;
+        2) menu_databases ;;
+        3) menu_server ;;
+        4) menu_info ;;
+        5|*)
+            clear
+            exit 0
+            ;;
+    esac
+done

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=ProtoSec Tools
+Comment=Menú de herramientas de ProtoSec OS
+Exec=konsole -e protosec-tools
+Icon=applications-system
+Terminal=false
+Type=Application
+Categories=System;Security;
+Keywords=protosec;herramientas;pentesting;seguridad;

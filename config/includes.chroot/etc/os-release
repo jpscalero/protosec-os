@@ -1,0 +1,11 @@
+PRETTY_NAME="ProtoSec OS 1.0"
+NAME="ProtoSec"
+VERSION_ID="1.0"
+VERSION="1.0 (Bookworm)"
+VERSION_CODENAME=bookworm
+ID=protosec
+ID_LIKE=debian
+HOME_URL="https://protosec.org"
+SUPPORT_URL="https://protosec.org/soporte"
+BUG_REPORT_URL="https://protosec.org/bugs"
+ANSI_COLOR="0;32"

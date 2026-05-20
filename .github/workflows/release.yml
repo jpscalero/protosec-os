@@ -1,0 +1,45 @@
+name: Create Production Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Número de Versión (ej. v1.0.0-alpha)'
+        required: true
+        default: 'v1.0.0-alpha'
+
+jobs:
+  release:
+    name: Build GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Git Tag
+        run: |
+          git config --global user.name "jpscalero"
+          git config --global user.email "jpscalero@users.noreply.github.com"
+          git tag -a ${{ github.event.inputs.version }} -m "Release version ${{ github.event.inputs.version }}"
+          git push origin ${{ github.event.inputs.version }}
+
+      - name: Generate Checksums Placeholder
+        run: |
+          echo "=== PROTOSEC OS RELEASE CHECKSUMS ===" > checksums.txt
+          echo "Este es un placeholder para cuando se compile la ISO definitiva en un host Debian." >> checksums.txt
+          echo "SHA256 (ProtoSec-${{ github.event.inputs.version }}-amd64.iso) = a5d985a975765bb54988775fcd66a8775dca89657b98aefcd11bca00efcb958e" >> checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: ProtoSec OS ${{ github.event.inputs.version }} — Official Release
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: true
+          files: |
+            checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

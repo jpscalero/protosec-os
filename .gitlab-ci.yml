@@ -1,0 +1,80 @@
+stages:
+  - lint
+  - validate
+  - docs
+  - release
+
+shellcheck:
+  stage: lint
+  image: koalaman/shellcheck-alpine:stable
+  script:
+    - echo "Iniciando análisis ShellCheck..."
+    - shellcheck --version
+    - find . -name "*.sh" -not -path "*/.oh-my-zsh/*" -exec shellcheck -e SC2086 -e SC1090 -e SC1091 {} +
+    - find config/hooks/live/ -name "*.hook.chroot" -exec shellcheck -e SC2086 -e SC1090 -e SC1091 {} +
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+
+validate-structure:
+  stage: validate
+  image: alpine:latest
+  script:
+    - echo "Validando directorios esenciales..."
+    - for folder in auto config config/package-lists config/hooks/live config/includes.chroot docs scripts assets; do
+        if [ ! -d "$folder" ]; then echo "✗ Error directorio $folder ausente" && exit 1; fi;
+      done
+    - echo "✓ Estructura de directorios válida."
+    - echo "Validando archivos de gobernanza..."
+    - for file in build.sh README.md LICENSE CODE_OF_CONDUCT.md CONTRIBUTING.md SECURITY.md CHANGELOG.md; do
+        if [ ! -f "$file" ]; then echo "✗ Error archivo $file ausente" && exit 1; fi;
+      done
+    - echo "✓ Archivos obligatorios verificados."
+    - echo "Verificando permisos ejecutables..."
+    - if [ ! -x "build.sh" ]; then echo "✗ build.sh no es ejecutable" && exit 1; fi
+    - for script in auto/config auto/build auto/clean; do
+        if [ ! -x "$script" ]; then echo "✗ $script no es ejecutable" && exit 1; fi;
+      done
+    - for hook in config/hooks/live/*.hook.chroot; do
+        if [ ! -x "$hook" ]; then echo "✗ $hook no es ejecutable" && exit 1; fi;
+      done
+    - echo "✓ Permisos de ejecución correctos."
+  rules:
+    - if: $CI_COMMIT_BRANCH
+
+validate-packages:
+  stage: validate
+  image: alpine:latest
+  script:
+    - echo "Verificando que las listas de paquetes no estén vacías..."
+    - for list in config/package-lists/*.list.chroot; do
+        if [ ! -s "$list" ]; then echo "✗ Error lista $list vacía" && exit 1; fi;
+      done
+    - echo "✓ Listas de paquetes correctas."
+  rules:
+    - if: $CI_COMMIT_BRANCH
+
+pages:
+  stage: docs
+  image: python:3.9-alpine
+  script:
+    - pip install mkdocs
+    - mkdocs build --site-dir public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+gitlab-release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  script:
+    - echo "Creando release oficial en GitLab..."
+  release:
+    name: "ProtoSec OS $CI_COMMIT_TAG"
+    tag_name: "$CI_COMMIT_TAG"
+    description: "Release del sistema compilado y verificado de ProtoSec OS v$CI_COMMIT_TAG"
+  rules:
+    - if: $CI_COMMIT_TAG

@@ -1,0 +1,88 @@
+name: Repository Structure Check
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  structure-check:
+    name: Validate Directory Structure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Verify Key Folders
+        run: |
+          echo "Verificando estructura de directorios..."
+          for folder in auto config config/package-lists config/hooks/live config/includes.chroot docs scripts assets; do
+            if [ -d "$folder" ]; then
+              echo "✓ Directorio $folder existe."
+            else
+              echo "✗ Error: Directorio $folder no encontrado."
+              exit 1
+            fi
+          done
+
+      - name: Verify Key Files
+        run: |
+          echo "Verificando presencia de archivos obligatorios..."
+          for file in build.sh README.md LICENSE CODE_OF_CONDUCT.md CONTRIBUTING.md SECURITY.md CHANGELOG.md; do
+            if [ -f "$file" ]; then
+              echo "✓ Archivo $file existe."
+            else
+              echo "✗ Error: Archivo $file no encontrado."
+              exit 1
+            fi
+          done
+
+      - name: Verify Package Lists
+        run: |
+          echo "Verificando que las listas de paquetes no estén vacías..."
+          for list in config/package-lists/*.list.chroot; do
+            if [ -s "$list" ]; then
+              echo "✓ Lista de paquetes $(basename $list) — OK."
+            else
+              echo "✗ Error: Lista de paquetes $list está vacía."
+              exit 1
+            fi
+          done
+
+      - name: Verify Executable Flags
+        run: |
+          echo "Verificando permisos de ejecución..."
+          # build.sh
+          if [ -x "build.sh" ]; then
+            echo "✓ build.sh tiene permisos de ejecución."
+          else
+            echo "✗ Error: build.sh no tiene permisos de ejecución (chmod +x)."
+            exit 1
+          fi
+          
+          # auto scripts
+          for script in auto/config auto/build auto/clean; do
+            if [ -x "$script" ]; then
+              echo "✓ $script tiene permisos de ejecución."
+            else
+              echo "✗ Error: $script no tiene permisos de ejecución."
+              exit 1
+            fi
+          done
+
+          # chroot hooks
+          for hook in config/hooks/live/*.hook.chroot; do
+            if [ -x "$hook" ]; then
+              echo "✓ $(basename $hook) tiene permisos de ejecución."
+            else
+              echo "✗ Error: $hook no tiene permisos de ejecución."
+              exit 1
+            fi
+          done
+
+      - name: Validate TOML/JSON Files
+        run: |
+          echo "Instalando dependencias de validación..."
+          pip3 install toml
+          python3 -c "import toml; toml.load('config/includes.chroot/etc/skel/.config/starship.toml'); print('✓ starship.toml sintaxis TOML válida')"

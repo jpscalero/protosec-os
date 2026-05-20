@@ -1,0 +1,193 @@
+#!/bin/bash
+# =====================================================================
+# ProtoSec OS 1.0 — Hook 0050: Configuración del Servidor y Seguridad
+# =====================================================================
+set -e
+
+export DEBIAN_FRONTEND=noninteractive
+
+echo "[ProtoSec] Iniciando Hook 0050 — Configuración del Servidor y Seguridad..."
+
+# --- Directorio temporal para descargas ---
+mkdir -p /tmp/protosec-srv-install
+cd /tmp/protosec-srv-install
+
+# =====================================================================
+# SECCIÓN 1: Instalación de Grafana y Docker CE
+# =====================================================================
+echo "[ProtoSec] Instalando Grafana..."
+apt-get install -y grafana || echo "[AVISO] No se pudo instalar Grafana."
+
+echo "[ProtoSec] Instalando Docker CE..."
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin || {
+    echo "[AVISO] Falló la instalación de Docker CE. Usando docker.io como fallback..."
+    apt-get install -y docker.io docker-compose || echo "[AVISO] Falló también la instalación de docker.io."
+}
+
+# =====================================================================
+# SECCIÓN 2: Instalación de Gitea, Traefik y Jenkins
+# =====================================================================
+echo "[ProtoSec] Instalando Gitea..."
+GITEA_VERSION=$(curl -sL https://api.github.com/repos/go-gitea/gitea/releases/latest | grep tag_name | cut -d'"' -f4 || echo "")
+if [ -n "$GITEA_VERSION" ]; then
+    # Eliminar 'v' del tag
+    GITEA_VER_NUM="${GITEA_VERSION#v}"
+    wget -q "https://github.com/go-gitea/gitea/releases/download/${GITEA_VERSION}/gitea-${GITEA_VER_NUM}-linux-amd64" -O gitea || true
+    if [ -f gitea ]; then
+        mv gitea /usr/local/bin/gitea
+        chmod +x /usr/local/bin/gitea
+        
+        # Crear usuario del sistema para Gitea
+        id -u gitea &>/dev/null || adduser --system --shell /bin/bash --gecos 'Gitea Git Service' --group --disabled-password --home /var/lib/gitea gitea
+        
+        # Crear estructura de directorios
+        mkdir -p /var/lib/gitea/{custom,data,log}
+        mkdir -p /etc/gitea
+        chown -R gitea:gitea /var/lib/gitea/
+        chown -R gitea:gitea /etc/gitea
+        chmod -R 750 /var/lib/gitea/
+        chmod 770 /etc/gitea
+        
+        # Crear archivo de servicio systemd
+        cat > /etc/systemd/system/gitea.service << 'EOF'
+[Unit]
+Description=Gitea (Git with a cup of tea)
+After=syslog.target
+After=network.target
+
+[Service]
+LimitMEMLOCK=infinity
+LimitNOFILE=65535
+RestartSec=2s
+Type=simple
+User=gitea
+Group=gitea
+WorkingDirectory=/var/lib/gitea/
+RuntimeDirectory=gitea
+ExecStart=/usr/local/bin/gitea web --config /etc/gitea/app.ini
+Restart=always
+Environment=USER=gitea HOME=/var/lib/gitea GITEA_WORK_DIR=/var/lib/gitea
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    fi
+fi
+
+# Traefik
+echo "[ProtoSec] Instalando Traefik..."
+TRAEFIK_VERSION=$(curl -sL https://api.github.com/repos/traefik/traefik/releases/latest | grep tag_name | cut -d'"' -f4 || echo "")
+if [ -n "$TRAEFIK_VERSION" ]; then
+    wget -q "https://github.com/traefik/traefik/releases/download/${TRAEFIK_VERSION}/traefik_${TRAEFIK_VERSION}_linux_amd64.tar.gz" -O traefik.tar.gz || true
+    if [ -f traefik.tar.gz ]; then
+        tar xzf traefik.tar.gz traefik || true
+        [ -f traefik ] && mv traefik /usr/local/bin/ && chmod +x /usr/local/bin/traefik || true
+        rm -f traefik.tar.gz
+    fi
+fi
+
+# Jenkins Asistente
+echo "[ProtoSec] Creando script de preparación para Jenkins..."
+cat > /usr/local/bin/instalar-jenkins << 'JENKINSEOF'
+#!/bin/bash
+# Asistente para la preparación de Jenkins
+echo "=================================================="
+echo "          Instalador de Jenkins                   "
+echo "=================================================="
+echo ""
+echo "Para instalar Jenkins en el sistema base ejecutado, usa:"
+echo "  sudo apt-get install -y default-jre"
+echo "  wget -q -O - https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo apt-key add -"
+echo "  sudo sh -c 'echo deb http://pkg.jenkins.io/debian-stable binary/ > /etc/apt/sources.list.d/jenkins.list'"
+echo "  sudo apt-get update"
+echo "  sudo apt-get install -y jenkins"
+echo ""
+JENKINSEOF
+chmod +x /usr/local/bin/instalar-jenkins
+
+# Netdata
+echo "[ProtoSec] Instalando Netdata..."
+apt-get install -y netdata || echo "[AVISO] Netdata no se pudo instalar desde repositorios."
+
+# =====================================================================
+# SECCIÓN 3: Configuración de Servicios (Habilitar / Deshabilitar)
+# =====================================================================
+echo "[ProtoSec] Configurando estado inicial de los servicios..."
+
+# Servicios que deben arrancar automáticamente
+for svc in sddm NetworkManager ufw fail2ban auditd apparmor cron; do
+    if systemctl list-unit-files | grep -q "^${svc}.service"; then
+        systemctl enable "${svc}" || true
+    fi
+done
+
+# Servicios de servidor/pentesting que deben permanecer inactivos por defecto
+for svc in ssh mariadb postgresql redis-server mongod elasticsearch nginx apache2 docker openvpn wireguard grafana jenkins gitea netdata cockpit prometheus; do
+    if systemctl list-unit-files | grep -q "^${svc}.service"; then
+        systemctl disable "${svc}" || true
+    fi
+done
+
+# =====================================================================
+# SECCIÓN 4: Endurecimiento de Seguridad (Hardening)
+# =====================================================================
+echo "[ProtoSec] Configurando Cortafuegos (UFW)..."
+if command -v ufw &>/dev/null; then
+    # Desactivar temporalmente durante construcción si estuviera activo
+    ufw disable || true
+    ufw default deny incoming
+    ufw default allow outgoing
+    ufw allow 22/tcp
+fi
+
+echo "[ProtoSec] Configurando Fail2Ban..."
+mkdir -p /etc/fail2ban
+cat > /etc/fail2ban/jail.local << 'EOF'
+[DEFAULT]
+bantime = 3600
+findtime = 600
+maxretry = 3
+
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+EOF
+
+echo "[ProtoSec] Endureciendo la configuración de SSH (sshd_config)..."
+mkdir -p /etc/ssh/sshd_config.d
+cat > /etc/ssh/sshd_config.d/protosec-hardening.conf << 'EOF'
+# Configuración de endurecimiento para ProtoSec OS 1.0
+PermitRootLogin no
+PasswordAuthentication no
+MaxAuthTries 3
+ClientAliveInterval 300
+ClientAliveCountMax 2
+X11Forwarding no
+AllowAgentForwarding no
+Protocol 2
+EOF
+
+# Forzar el uso del archivo de configuración endurecido en el sshd_config principal si existe
+if [ -f /etc/ssh/sshd_config ]; then
+    # Asegurar que se incluyan las configuraciones del directorio sshd_config.d
+    if ! grep -q "Include /etc/ssh/sshd_config.d/\*.conf" /etc/ssh/sshd_config; then
+        echo "Include /etc/ssh/sshd_config.d/*.conf" | cat - /etc/ssh/sshd_config > temp && mv temp /etc/ssh/sshd_config
+        rm -f temp
+    fi
+fi
+
+# AppArmor activo por defecto
+if command -v apparmor_parser &>/dev/null; then
+    echo "[ProtoSec] AppArmor está activo y configurado."
+fi
+
+# Limpieza final
+cd /
+rm -rf /tmp/protosec-srv-install
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+
+echo "[ProtoSec] Hook 0050 completado exitosamente."

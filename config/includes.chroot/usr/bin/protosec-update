@@ -1,0 +1,288 @@
+#!/bin/bash
+# ============================================================================
+# protosec-update — Script de actualización del sistema ProtoSec OS 1.0
+# ============================================================================
+# Descripción: Actualiza todos los componentes del sistema de forma ordenada:
+#   - Paquetes del sistema (apt)
+#   - Paquetes de Python (pip3)
+#   - Gemas de Ruby (gem)
+#   - Repositorios Git clonados en /opt
+#   - Bases de datos de herramientas de seguridad
+#   - Limpieza final del sistema
+#
+# Uso: sudo protosec-update
+# Requisitos: Ejecutar como root
+# Log: /var/log/protosec-update.log
+# ============================================================================
+
+# --- Colores para la salida ---
+VERDE='\033[0;32m'
+ROJO='\033[0;31m'
+AMARILLO='\033[1;33m'
+CYAN='\033[0;36m'
+NEGRITA='\033[1m'
+SIN_COLOR='\033[0m'
+
+# --- Variables globales ---
+ARCHIVO_LOG="/var/log/protosec-update.log"
+ERRORES=0
+FASES_OK=0
+FASES_TOTAL=6
+INICIO_EPOCH=$(date +%s)
+
+# --- Función para registrar mensajes en log y pantalla ---
+registrar() {
+    local nivel="$1"
+    local mensaje="$2"
+    local marca_tiempo
+    marca_tiempo=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[${marca_tiempo}] [${nivel}] ${mensaje}" >> "$ARCHIVO_LOG"
+
+    case "$nivel" in
+        INFO)    echo -e "${CYAN}[${marca_tiempo}]${SIN_COLOR} ${mensaje}" ;;
+        OK)      echo -e "${VERDE}[${marca_tiempo}]${SIN_COLOR} ✔ ${mensaje}" ;;
+        ERROR)   echo -e "${ROJO}[${marca_tiempo}]${SIN_COLOR} ✘ ${mensaje}" ;;
+        AVISO)   echo -e "${AMARILLO}[${marca_tiempo}]${SIN_COLOR} ⚠ ${mensaje}" ;;
+    esac
+}
+
+# --- Función para mostrar el banner ---
+mostrar_banner() {
+    echo -e "${VERDE}"
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║       === ProtoSec OS — Actualización del Sistema ===      ║"
+    echo "║                     Versión 1.0                            ║"
+    echo "║              Hack. Analyze. Deploy.                        ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo -e "${SIN_COLOR}"
+}
+
+# --- Función para ejecutar una fase con control de errores ---
+ejecutar_fase() {
+    local numero="$1"
+    local nombre="$2"
+    echo ""
+    echo -e "${NEGRITA}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${SIN_COLOR}"
+    echo -e "${NEGRITA}  Fase ${numero}/${FASES_TOTAL}: ${nombre}${SIN_COLOR}"
+    echo -e "${NEGRITA}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${SIN_COLOR}"
+    registrar "INFO" "Iniciando Fase ${numero}: ${nombre}"
+}
+
+# --- Verificar ejecución como root ---
+if [ "$(id -u)" -ne 0 ]; then
+    echo -e "${ROJO}Error: Este script debe ejecutarse como root.${SIN_COLOR}"
+    echo -e "Uso: ${NEGRITA}sudo protosec-update${SIN_COLOR}"
+    exit 1
+fi
+
+# --- Inicializar archivo de log ---
+echo "================================================================" >> "$ARCHIVO_LOG"
+echo "  Inicio de actualización: $(date '+%Y-%m-%d %H:%M:%S')" >> "$ARCHIVO_LOG"
+echo "================================================================" >> "$ARCHIVO_LOG"
+
+# --- Mostrar banner e información de inicio ---
+mostrar_banner
+registrar "INFO" "Inicio de actualización del sistema ProtoSec OS"
+registrar "INFO" "Fecha y hora de inicio: $(date '+%A, %d de %B de %Y — %H:%M:%S')"
+registrar "INFO" "Kernel: $(uname -r)"
+registrar "INFO" "Registro en: ${ARCHIVO_LOG}"
+echo ""
+
+# ============================================================================
+# FASE 1: Actualización del sistema base (APT)
+# ============================================================================
+ejecutar_fase 1 "Actualización del sistema base (APT)"
+
+registrar "INFO" "Actualizando índice de paquetes..."
+if apt-get update -qq 2>> "$ARCHIVO_LOG"; then
+    registrar "OK" "Índice de paquetes actualizado correctamente"
+else
+    registrar "ERROR" "Error al actualizar el índice de paquetes"
+    ERRORES=$((ERRORES + 1))
+fi
+
+registrar "INFO" "Aplicando actualizaciones del sistema (dist-upgrade)..."
+if apt-get dist-upgrade -y -q 2>> "$ARCHIVO_LOG"; then
+    registrar "OK" "Sistema base actualizado correctamente"
+    FASES_OK=$((FASES_OK + 1))
+else
+    registrar "ERROR" "Error durante la actualización del sistema base"
+    ERRORES=$((ERRORES + 1))
+fi
+
+# ============================================================================
+# FASE 2: Actualización de herramientas Python (pip3)
+# ============================================================================
+ejecutar_fase 2 "Actualización de herramientas Python (pip3)"
+
+if command -v pip3 &> /dev/null; then
+    registrar "INFO" "Buscando paquetes pip desactualizados..."
+    PAQUETES_PIP=$(pip3 list --outdated --format=json 2>/dev/null | \
+        python3 -c "import sys,json; [print(p['name']) for p in json.load(sys.stdin)]" 2>/dev/null)
+
+    if [ -n "$PAQUETES_PIP" ]; then
+        NUM_PIP=$(echo "$PAQUETES_PIP" | wc -l)
+        registrar "INFO" "Se encontraron ${NUM_PIP} paquetes pip para actualizar"
+        echo "$PAQUETES_PIP" | xargs -r pip3 install --break-system-packages -U 2>> "$ARCHIVO_LOG"
+        if [ $? -eq 0 ]; then
+            registrar "OK" "Paquetes pip actualizados correctamente"
+            FASES_OK=$((FASES_OK + 1))
+        else
+            registrar "AVISO" "Algunos paquetes pip no se pudieron actualizar"
+            ERRORES=$((ERRORES + 1))
+        fi
+    else
+        registrar "OK" "Todos los paquetes pip están al día"
+        FASES_OK=$((FASES_OK + 1))
+    fi
+else
+    registrar "AVISO" "pip3 no está instalado, se omite esta fase"
+fi
+
+# ============================================================================
+# FASE 3: Actualización de gemas de Ruby (gem)
+# ============================================================================
+ejecutar_fase 3 "Actualización de herramientas Ruby (gem)"
+
+if command -v gem &> /dev/null; then
+    registrar "INFO" "Actualizando gemas de Ruby..."
+    if gem update --no-document 2>> "$ARCHIVO_LOG"; then
+        registrar "OK" "Gemas de Ruby actualizadas correctamente"
+        FASES_OK=$((FASES_OK + 1))
+    else
+        registrar "ERROR" "Error al actualizar las gemas de Ruby"
+        ERRORES=$((ERRORES + 1))
+    fi
+else
+    registrar "AVISO" "gem no está instalado, se omite esta fase"
+fi
+
+# ============================================================================
+# FASE 4: Actualización de repositorios Git en /opt
+# ============================================================================
+ejecutar_fase 4 "Actualización de repositorios Git en /opt"
+
+# Lista de repositorios conocidos para actualizar
+REPOS_GIT=(/opt/exploitdb /opt/set /opt/SecLists)
+REPOS_ACTUALIZADOS=0
+
+# También buscar otros repositorios git en /opt
+for directorio in /opt/*/; do
+    # Verificar si es un directorio con repositorio git
+    if [ -d "${directorio}.git" ]; then
+        # Evitar duplicados con los repos conocidos
+        ya_listado=false
+        for repo_conocido in "${REPOS_GIT[@]}"; do
+            if [ "$(realpath "$directorio" 2>/dev/null)" = "$(realpath "$repo_conocido" 2>/dev/null)" ]; then
+                ya_listado=true
+                break
+            fi
+        done
+        if [ "$ya_listado" = false ]; then
+            REPOS_GIT+=("${directorio%/}")
+        fi
+    fi
+done
+
+for repo in "${REPOS_GIT[@]}"; do
+    if [ -d "${repo}/.git" ]; then
+        nombre_repo=$(basename "$repo")
+        registrar "INFO" "Actualizando repositorio: ${nombre_repo} (${repo})"
+        if git -C "$repo" pull --ff-only 2>> "$ARCHIVO_LOG"; then
+            registrar "OK" "Repositorio ${nombre_repo} actualizado"
+            REPOS_ACTUALIZADOS=$((REPOS_ACTUALIZADOS + 1))
+        else
+            registrar "AVISO" "No se pudo actualizar ${nombre_repo} (posibles cambios locales)"
+            ERRORES=$((ERRORES + 1))
+        fi
+    else
+        registrar "AVISO" "Repositorio no encontrado: ${repo}"
+    fi
+done
+
+registrar "INFO" "Repositorios Git actualizados: ${REPOS_ACTUALIZADOS}"
+if [ $REPOS_ACTUALIZADOS -gt 0 ] || [ ${#REPOS_GIT[@]} -eq 0 ]; then
+    FASES_OK=$((FASES_OK + 1))
+fi
+
+# ============================================================================
+# FASE 5: Actualización de bases de datos de herramientas
+# ============================================================================
+ejecutar_fase 5 "Actualización de bases de datos de herramientas"
+
+# Actualizar base de datos de SearchSploit
+if command -v searchsploit &> /dev/null; then
+    registrar "INFO" "Actualizando base de datos de SearchSploit..."
+    if searchsploit -u 2>> "$ARCHIVO_LOG"; then
+        registrar "OK" "Base de datos de SearchSploit actualizada"
+    else
+        registrar "AVISO" "Error al actualizar SearchSploit"
+        ERRORES=$((ERRORES + 1))
+    fi
+else
+    registrar "AVISO" "searchsploit no encontrado, se omite su actualización"
+fi
+
+# Actualizar base de datos de ClamAV
+if command -v freshclam &> /dev/null; then
+    registrar "INFO" "Actualizando base de datos de ClamAV (freshclam)..."
+    if freshclam 2>> "$ARCHIVO_LOG"; then
+        registrar "OK" "Base de datos de ClamAV actualizada"
+    else
+        registrar "AVISO" "Error al actualizar ClamAV (puede estar bloqueado por el daemon)"
+        ERRORES=$((ERRORES + 1))
+    fi
+else
+    registrar "AVISO" "freshclam no encontrado, se omite actualización de ClamAV"
+fi
+
+FASES_OK=$((FASES_OK + 1))
+
+# ============================================================================
+# FASE 6: Limpieza del sistema
+# ============================================================================
+ejecutar_fase 6 "Limpieza del sistema"
+
+registrar "INFO" "Eliminando paquetes huérfanos..."
+if apt-get autoremove -y -q 2>> "$ARCHIVO_LOG"; then
+    registrar "OK" "Paquetes huérfanos eliminados"
+else
+    registrar "AVISO" "Error al eliminar paquetes huérfanos"
+fi
+
+registrar "INFO" "Limpiando caché de paquetes..."
+if apt-get autoclean -q 2>> "$ARCHIVO_LOG"; then
+    registrar "OK" "Caché de paquetes limpiada"
+    FASES_OK=$((FASES_OK + 1))
+else
+    registrar "AVISO" "Error al limpiar la caché"
+fi
+
+# ============================================================================
+# RESUMEN FINAL
+# ============================================================================
+FIN_EPOCH=$(date +%s)
+TIEMPO_TOTAL=$((FIN_EPOCH - INICIO_EPOCH))
+MINUTOS=$((TIEMPO_TOTAL / 60))
+SEGUNDOS=$((TIEMPO_TOTAL % 60))
+
+echo ""
+echo -e "${VERDE}"
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║              RESUMEN DE ACTUALIZACIÓN                      ║"
+echo "╠══════════════════════════════════════════════════════════════╣"
+printf "║  Fases completadas: %-38s ║\n" "${FASES_OK}/${FASES_TOTAL}"
+printf "║  Errores encontrados: %-36s ║\n" "${ERRORES}"
+printf "║  Tiempo total: %-42s ║\n" "${MINUTOS}m ${SEGUNDOS}s"
+printf "║  Fecha finalización: %-37s ║\n" "$(date '+%d/%m/%Y %H:%M:%S')"
+printf "║  Log completo: %-42s ║\n" "${ARCHIVO_LOG}"
+echo "╚══════════════════════════════════════════════════════════════╝"
+echo -e "${SIN_COLOR}"
+
+if [ "$ERRORES" -gt 0 ]; then
+    registrar "AVISO" "Actualización completada con ${ERRORES} error(es). Revise el log."
+    exit 1
+else
+    registrar "OK" "Actualización completada exitosamente sin errores."
+    exit 0
+fi

@@ -1,0 +1,34 @@
+#!/bin/sh
+# ============================================
+# ProtoSec OS 1.0 — Configuración de live-build
+# Este archivo define todos los parámetros de
+# construcción de la distribución.
+# ============================================
+set -e
+
+lb config noauto \
+    --mode debian \
+    --system live \
+    --distribution bookworm \
+    --architectures amd64 \
+    --archive-areas "main contrib non-free non-free-firmware" \
+    --binary-images iso-hybrid \
+    --bootloaders syslinux,grub-efi \
+    --debian-installer none \
+    --iso-application "ProtoSec OS 1.0" \
+    --iso-publisher "ProtoSec Project; https://protosec.org" \
+    --iso-volume "ProtoSec_1.0" \
+    --memtest none \
+    --bootappend-live "boot=live components locales=es_ES.UTF-8 keyboard-layouts=es timezone=Europe/Madrid hostname=protosec username=protosec" \
+    --mirror-bootstrap "http://deb.debian.org/debian/" \
+    --mirror-chroot "http://deb.debian.org/debian/" \
+    --mirror-binary "http://deb.debian.org/debian/" \
+    --mirror-chroot-security "http://deb.debian.org/debian-security/" \
+    --mirror-binary-security "http://deb.debian.org/debian-security/" \
+    --updates true \
+    --security true \
+    --apt-recommends false \
+    --debootstrap-options "--include=apt-transport-https,ca-certificates,gnupg" \
+    --firmware-binary true \
+    --firmware-chroot true \
+    "${@}"

@@ -1,0 +1,28 @@
+# ============================================
+# ProtoSec OS 1.0 — Bases de Datos
+# ============================================
+# Servidores y clientes de bases de datos
+# relacionales y NoSQL para desarrollo,
+# pruebas y auditoría.
+# ============================================
+
+# --- MariaDB (fork de MySQL) ---
+mariadb-server
+mariadb-client
+
+# --- PostgreSQL ---
+postgresql
+postgresql-client
+postgresql-contrib
+
+# --- Redis (base de datos en memoria) ---
+redis-server
+redis-tools
+
+# --- SQLite (base de datos embebida) ---
+sqlite3
+libsqlite3-dev
+
+# --- Clientes interactivos mejorados ---
+mycli
+pgcli

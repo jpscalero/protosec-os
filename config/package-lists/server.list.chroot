@@ -1,0 +1,75 @@
+# ============================================
+# ProtoSec OS 1.0 — Servicios de Servidor
+# ============================================
+# Servidores web, contenedores, virtualización,
+# VPN, monitorización y herramientas de
+# hardening del sistema.
+# ============================================
+
+# --- Servidores web ---
+nginx
+apache2
+
+# --- PHP 8.2 y módulos esenciales ---
+php8.2
+php8.2-fpm
+php8.2-mysql
+php8.2-pgsql
+php8.2-curl
+php8.2-mbstring
+php8.2-xml
+php8.2-zip
+php8.2-gd
+
+# --- Certificados SSL/TLS ---
+certbot
+python3-certbot-nginx
+
+# --- Contenedores ---
+docker.io
+docker-compose
+podman
+
+# --- Virtualización KVM/QEMU ---
+qemu-kvm
+libvirt-daemon-system
+virtinst
+virt-manager
+
+# --- VPN y túneles ---
+wireguard
+wireguard-tools
+openvpn
+stunnel4
+
+# --- Servicios de archivos y transferencias ---
+samba
+vsftpd
+
+# --- Automatización y orquestación ---
+ansible
+
+# --- Balanceo de carga y proxy ---
+haproxy
+squid
+
+# --- Panel de administración web ---
+cockpit
+
+# --- Monitorización del sistema ---
+prometheus
+glances
+
+# --- Detección de rootkits e intrusiones ---
+rkhunter
+chkrootkit
+aide
+auditd
+
+# --- Control de acceso obligatorio ---
+apparmor
+apparmor-utils
+
+# --- Antivirus ---
+clamav
+clamav-daemon

@@ -1,0 +1,196 @@
+#!/bin/bash
+# =====================================================================
+# ProtoSec OS 1.0 — Asistente de Configuración Inicial (protosec-setup)
+# =====================================================================
+
+# Verificar privilegios de root
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Error: Este script debe ejecutarse como root (sudo)."
+    exit 1
+fi
+
+export NEWT_COLORS='
+root=green,black
+window=black,green
+border=green,black
+shadow=black,black
+button=black,green
+actbutton=green,black
+checkbox=green,black
+actcheckbox=black,green
+entry=black,green
+listbox=green,black
+actlistbox=black,green
+textbox=green,black
+acttextbox=black,green
+'
+
+whiptail --title "ProtoSec OS 1.0" --msgbox "Bienvenido al asistente de configuración de ProtoSec OS.\n\nEste script le guiará a través de la configuración inicial de seguridad, usuarios y redes de su nuevo sistema." 12 60
+
+# --- PASO 1 y 2: Nombre de Usuario y Contraseña ---
+while true; do
+    USUARIO=$(whiptail --title "Crear Usuario Administrador" --inputbox "Introduce el nombre del nuevo usuario administrador:" 10 50 "" 3>&1 1>&2 2>&3)
+    if [ -z "$USUARIO" ]; then
+        whiptail --title "Error" --msgbox "El nombre de usuario no puede estar vacío." 8 40
+        continue
+    fi
+    
+    # Comprobar si existe
+    if id "$USUARIO" &>/dev/null; then
+        whiptail --title "Aviso" --msgbox "El usuario ya existe en el sistema. Se configurarán sus opciones." 8 45
+        break
+    else
+        break
+    fi
+done
+
+while true; do
+    PASS1=$(whiptail --title "Contraseña de Administrador" --passwordbox "Introduce la contraseña para $USUARIO:" 10 50 3>&1 1>&2 2>&3)
+    PASS2=$(whiptail --title "Contraseña de Administrador" --passwordbox "Repite la contraseña para verificación:" 10 50 3>&1 1>&2 2>&3)
+    
+    if [ "$PASS1" != "$PASS2" ]; then
+        whiptail --title "Error" --msgbox "Las contraseñas no coinciden. Inténtalo de nuevo." 8 45
+    elif [ -z "$PASS1" ]; then
+        whiptail --title "Error" --msgbox "La contraseña no puede estar vacía." 8 40
+    else
+        break
+    fi
+done
+
+# --- PASO 3: Crear el usuario y grupos ---
+whiptail --title "Configurando Usuario" --infobox "Creando el usuario y asignando grupos..." 8 45
+if ! id "$USUARIO" &>/dev/null; then
+    useradd -m -s /bin/zsh -G sudo,adm,cdrom,audio,video,plugdev,netdev,bluetooth,wireshark "$USUARIO"
+fi
+echo "$USUARIO:$PASS1" | chpasswd
+echo "$USUARIO ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$USUARIO"
+
+# --- PASO 4: Hostname Personalizado ---
+while true; do
+    NUEVO_HOSTNAME=$(whiptail --title "Nombre del Equipo" --inputbox "Introduce el nombre de red (hostname) para este equipo:" 10 50 "protosec" 3>&1 1>&2 2>&3)
+    if [ -z "$NUEVO_HOSTNAME" ]; then
+         whiptail --title "Error" --msgbox "El hostname no puede estar vacío." 8 40
+    else
+         echo "$NUEVO_HOSTNAME" > /etc/hostname
+         sed -i "s/127.0.1.1.*/127.0.1.1 $NUEVO_HOSTNAME/g" /etc/hosts
+         hostname "$NUEVO_HOSTNAME"
+         break
+    fi
+done
+
+# --- PASO 5: Configuración de Red ---
+RED_OPCION=$(whiptail --title "Configuración de Red" --menu "Selecciona el tipo de configuración de red:" 12 50 2 \
+    "DHCP" "Configuración automática de red por DHCP" \
+    "ESTATICA" "Configuración manual (IP estática)" 3>&1 1>&2 2>&3)
+
+if [ "$RED_OPCION" = "ESTATICA" ]; then
+    IP=$(whiptail --title "IP Estática" --inputbox "Introduce la Dirección IP (ej. 192.168.1.100):" 10 50 "" 3>&1 1>&2 2>&3)
+    MASK=$(whiptail --title "Máscara de Red" --inputbox "Introduce la Máscara de Red (ej. 255.255.255.0):" 10 50 "255.255.255.0" 3>&1 1>&2 2>&3)
+    GW=$(whiptail --title "Puerta de Enlace" --inputbox "Introduce la Puerta de Enlace (ej. 192.168.1.1):" 10 50 "" 3>&1 1>&2 2>&3)
+    DNS=$(whiptail --title "DNS" --inputbox "Introduce el Servidor DNS principal (ej. 8.8.8.8):" 10 50 "8.8.8.8" 3>&1 1>&2 2>&3)
+    
+    # Crear configuración de red manual para systemd-networkd o interfaces
+    cat > /etc/network/interfaces << EOF
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet static
+    address $IP
+    netmask $MASK
+    gateway $GW
+    dns-nameservers $DNS
+EOF
+fi
+
+# --- PASO 6: Checklist de Servicios al Arranque ---
+SERVICIOS=$(whiptail --title "Servicios del Sistema" --checklist \
+    "Selecciona los servicios que deseas arrancar al inicio:" 18 60 9 \
+    "ssh" "Acceso seguro por SSH (Servidor)" ON \
+    "docker" "Contenedores Docker Daemon" OFF \
+    "mariadb" "Base de datos MariaDB (MySQL)" OFF \
+    "postgresql" "Base de datos PostgreSQL" OFF \
+    "mongodb" "Base de datos MongoDB" OFF \
+    "redis-server" "Caché en memoria Redis" OFF \
+    "nginx" "Servidor Web Nginx" OFF \
+    "cockpit" "Panel administrativo web de Cockpit" OFF \
+    "wireguard" "VPN Segura WireGuard" OFF 3>&1 1>&2 2>&3)
+
+# Aplicar las preferencias de inicio de servicios
+for svc in ssh docker mariadb postgresql mongodb redis-server nginx cockpit; do
+    if [[ "$SERVICIOS" == *"$svc"* ]]; then
+        systemctl enable "$svc" || true
+    else
+        systemctl disable "$svc" || true
+    fi
+done
+
+# --- PASO 7: Configuración de Contraseñas de Bases de Datos ---
+if [[ "$SERVICIOS" == *"mariadb"* ]]; then
+    MYSQL_ROOT_PASS=$(whiptail --title "Seguridad MariaDB" --passwordbox "Introduce la nueva contraseña de root para MariaDB:" 10 50 3>&1 1>&2 2>&3)
+    if [ -n "$MYSQL_ROOT_PASS" ]; then
+        whiptail --title "MariaDB" --infobox "Configurando privilegios de MariaDB..." 8 45
+        sudo systemctl start mariadb || true
+        sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$MYSQL_ROOT_PASS'; FLUSH PRIVILEGES;" || true
+    fi
+fi
+
+if [[ "$SERVICIOS" == *"postgresql"* ]]; then
+    PG_USER_PASS=$(whiptail --title "Seguridad PostgreSQL" --passwordbox "Introduce contraseña para el administrador postgres de PostgreSQL:" 10 50 3>&1 1>&2 2>&3)
+    if [ -n "$PG_USER_PASS" ]; then
+        whiptail --title "PostgreSQL" --infobox "Configurando privilegios de PostgreSQL..." 8 45
+        sudo systemctl start postgresql || true
+        sudo -u postgres psql -c "ALTER USER postgres PASSWORD '$PG_USER_PASS';" || true
+    fi
+fi
+
+# --- PASO 8: WireGuard VPN básico ---
+if [[ "$SERVICIOS" == *"wireguard"* ]]; then
+    whiptail --title "WireGuard" --infobox "Generando par de claves criptográficas de WireGuard..." 8 50
+    mkdir -p /etc/wireguard
+    chmod 700 /etc/wireguard
+    wg genkey | tee /etc/wireguard/private.key | wg pubkey > /etc/wireguard/public.key || true
+    
+    # Crear configuración básica
+    PRIV_KEY=$(cat /etc/wireguard/private.key 2>/dev/null || echo "CLAVE_PRIVADA")
+    cat > /etc/wireguard/wg0.conf << EOF
+[Interface]
+PrivateKey = $PRIV_KEY
+Address = 10.0.0.1/24
+ListenPort = 51820
+EOF
+    PUB_KEY=$(cat /etc/wireguard/public.key 2>/dev/null || echo "CLAVE_PUBLICA")
+    whiptail --title "Clave pública WireGuard" --msgbox "Su par de claves ha sido generado.\n\nClave Pública:\n$PUB_KEY\n\nArchivo guardado en: /etc/wireguard/wg0.conf" 15 65
+fi
+
+# --- PASO 9: Hardening y SSH ---
+whiptail --title "Seguridad / Hardening" --infobox "Aplicando reglas de cortafuegos y endurecimiento SSH..." 8 50
+
+# Configurar SSH Port opcional
+PORT_SSH=$(whiptail --title "Puerto SSH" --inputbox "Introduce el puerto en el que escuchará SSH:" 10 50 "22" 3>&1 1>&2 2>&3)
+if [ "$PORT_SSH" != "22" ] && [ -n "$PORT_SSH" ]; then
+    sed -i "s/#Port 22/Port $PORT_SSH/g" /etc/ssh/sshd_config || true
+    # Cambiar en el firewall
+    ufw allow "$PORT_SSH"/tcp comment 'SSH' || true
+else
+    ufw allow 22/tcp comment 'SSH' || true
+fi
+
+# Habilitar UFW y Fail2Ban
+ufw --force enable || true
+systemctl start fail2ban || true
+
+# --- PASO 10 y 11: Resumen Final ---
+RESUMEN="=== RESUMEN DE LA CONFIGURACIÓN ===\n"
+RESUMEN="$RESUMEN\n• Usuario Administrador: $USUARIO"
+RESUMEN="$RESUMEN\n• Red: $RED_OPCION"
+RESUMEN="$RESUMEN\n• Hostname: $NUEVO_HOSTNAME"
+RESUMEN="$RESUMEN\n• Servicios al Inicio: $SERVICIOS"
+RESUMEN="$RESUMEN\n• Cortafuegos (UFW): Activo"
+RESUMEN="$RESUMEN\n• Puerto SSH: ${PORT_SSH:-22}"
+
+whiptail --title "Configuración Completada" --msgbox "$RESUMEN\n\nEl sistema se ha endurecido y configurado según sus especificaciones de seguridad. Se recomienda reiniciar para aplicar los cambios." 18 60
+
+if whiptail --title "Reiniciar Sistema" --yesno "¿Desea reiniciar el sistema ahora?" 10 45; then
+    reboot
+fi

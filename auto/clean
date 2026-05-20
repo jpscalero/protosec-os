@@ -1,0 +1,7 @@
+#!/bin/sh
+# ============================================
+# ProtoSec OS 1.0 — Script de limpieza
+# Elimina artefactos de construcciones previas.
+# ============================================
+set -e
+lb clean noauto "${@}"

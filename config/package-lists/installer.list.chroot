@@ -1,0 +1,21 @@
+# ============================================
+# ProtoSec OS 1.0 — Instalador Calamares
+# ============================================
+# Paquetes necesarios para el instalador
+# gráfico Calamares y las herramientas de
+# particionado y formateo de discos.
+# ============================================
+
+# --- Instalador gráfico Calamares ---
+calamares
+calamares-settings-debian
+
+# --- Herramientas de sistemas de archivos ---
+dosfstools
+e2fsprogs
+btrfs-progs
+xfsprogs
+ntfs-3g
+
+# --- Bootloader UEFI para la instalación ---
+grub-efi-amd64-bin

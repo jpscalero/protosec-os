@@ -1,0 +1,24 @@
+---
+componentName: protosec
+welcomeStyleCalamares: true
+strings:
+    productName: ProtoSec OS
+    shortProductName: ProtoSec
+    version: "1.0"
+    shortVersion: "1.0"
+    versionedName: ProtoSec OS 1.0
+    shortVersionedName: ProtoSec 1.0
+    bootloaderEntryName: ProtoSec
+    productUrl: https://protosec.org
+    supportUrl: https://protosec.org/soporte
+    knownIssuesUrl: https://protosec.org/problemas
+    releaseNotesUrl: https://protosec.org/novedades
+images:
+    productLogo: logo.png
+    productIcon: logo.png
+    productWelcome: welcome.png
+style:
+    sidebarBackground: "#1A1A2E"
+    sidebarText: "#E0E0E0"
+    sidebarTextSelect: "#00FF41"
+    sidebarTextHighlight: "#FF6B35"

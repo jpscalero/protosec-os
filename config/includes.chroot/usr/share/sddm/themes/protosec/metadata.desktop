@@ -1,0 +1,10 @@
+[SddmGreeterTheme]
+Name=ProtoSec
+Description=Tema de inicio de sesión ProtoSec OS
+Author=ProtoSec Project
+Type=sddm-theme
+Version=1.0
+Website=https://protosec.org
+License=GPL-3.0
+Screenshot=preview.png
+MainScript=Main.qml

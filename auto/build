@@ -1,0 +1,7 @@
+#!/bin/sh
+# ============================================
+# ProtoSec OS 1.0 — Script de construcción automática
+# Ejecuta lb build y registra toda la salida.
+# ============================================
+set -e
+lb build noauto "${@}" 2>&1 | tee build.log

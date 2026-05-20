@@ -1,0 +1,68 @@
+# ============================================
+# ProtoSec OS 1.0 — Escritorio KDE Plasma
+# ============================================
+# Paquetes para el entorno de escritorio
+# KDE Plasma 5 con SDDM y aplicaciones
+# esenciales de productividad.
+# ============================================
+
+# --- Entorno de escritorio KDE Plasma ---
+kde-plasma-desktop
+sddm
+
+# --- Aplicaciones KDE esenciales ---
+konsole
+dolphin
+kate
+ark
+spectacle
+gwenview
+okular
+krunner
+
+# --- Complementos y extensiones de Plasma ---
+plasma-widgets-addons
+plasma-nm
+plasma-pa
+
+# --- Temas y apariencia visual ---
+breeze
+breeze-gtk-theme
+breeze-icon-theme
+papirus-icon-theme
+
+# --- Fuentes tipográficas ---
+fonts-noto
+fonts-noto-color-emoji
+fonts-firacode
+fonts-hack
+
+# --- Servidor gráfico y controladores ---
+xorg
+mesa-utils
+libgl1-mesa-dri
+
+# --- Navegadores web ---
+chromium
+firefox-esr
+
+# --- Cliente de correo electrónico ---
+thunderbird
+
+# --- Suite ofimática ---
+libreoffice
+
+# --- Reproductor multimedia ---
+vlc
+
+# --- Editor de imágenes ---
+gimp
+
+# --- Audio: PipeWire (sustituto moderno de PulseAudio) ---
+pipewire
+pipewire-pulse
+wireplumber
+
+# --- Integración con el escritorio ---
+xdg-utils
+xdg-user-dirs

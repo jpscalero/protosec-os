@@ -1,0 +1,14 @@
+[org.kde.kdecoration2]
+library=org.kde.breeze
+theme=Breeze
+
+[Effect-Blur]
+BlurStrength=10
+NoiseStrength=0
+
+[Compositing]
+Backend=OpenGL
+GLCore=true
+
+[Windows]
+Placement=Centered

@@ -1,0 +1,303 @@
+#!/bin/bash
+# =====================================================================
+# ProtoSec OS 1.0 — Hook 0030
+# Instalación y configuración de herramientas de pentesting externas
+# =====================================================================
+set -e
+
+export DEBIAN_FRONTEND=noninteractive
+export HOME=/root
+export GOPATH=/opt/go
+export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
+
+echo "[ProtoSec] Iniciando Hook 0030 — Instalando herramientas externas..."
+
+# --- Directorio temporal para descargas ---
+mkdir -p /tmp/protosec-install
+cd /tmp/protosec-install
+
+# =====================================================================
+# SECCIÓN 1: Herramientas Python (pip)
+# =====================================================================
+echo "[ProtoSec] Instalando herramientas Python mediante pip..."
+pip3 install --break-system-packages \
+    theHarvester \
+    netexec \
+    volatility3 \
+    sherlock-project \
+    wfuzz \
+    wafw00f \
+    fierce \
+    dnsrecon \
+    nosqlmap \
+    mongoaudit \
+    recon-ng || echo "[AVISO] Algunas herramientas de pip fallaron al instalar."
+
+# =====================================================================
+# SECCIÓN 2: Herramientas Ruby (gem)
+# =====================================================================
+echo "[ProtoSec] Instalando herramientas Ruby..."
+gem install evil-winrm --no-document || echo "[AVISO] evil-winrm no se pudo instalar."
+
+# =====================================================================
+# SECCIÓN 3: Herramientas Go y Compilados
+# =====================================================================
+echo "[ProtoSec] Instalando herramientas Go..."
+mkdir -p $GOPATH
+
+# gobuster — Compilación si no está presente
+if ! command -v gobuster &>/dev/null; then
+    go install github.com/OJ/gobuster/v3@latest 2>/dev/null || echo "[AVISO] gobuster no se pudo instalar desde Go"
+    [ -f $GOPATH/bin/gobuster ] && cp $GOPATH/bin/gobuster /usr/local/bin/ || true
+fi
+
+# ffuf — Fuzzer web rápido
+echo "[ProtoSec] Instalando ffuf..."
+FFUF_VERSION=$(curl -sL https://api.github.com/repos/ffuf/ffuf/releases/latest | grep tag_name | cut -d'"' -f4 || echo "")
+if [ -n "$FFUF_VERSION" ]; then
+    wget -q "https://github.com/ffuf/ffuf/releases/download/${FFUF_VERSION}/ffuf_${FFUF_VERSION#v}_linux_amd64.tar.gz" -O ffuf.tar.gz || true
+    if [ -f ffuf.tar.gz ]; then
+        tar xzf ffuf.tar.gz ffuf || true
+        [ -f ffuf ] && mv ffuf /usr/local/bin/ || true
+        rm -f ffuf.tar.gz
+    fi
+fi
+
+# subfinder — Descubrimiento de subdominios
+echo "[ProtoSec] Instalando subfinder..."
+SUBFINDER_VERSION=$(curl -sL https://api.github.com/repos/projectdiscovery/subfinder/releases/latest | grep tag_name | cut -d'"' -f4 || echo "")
+if [ -n "$SUBFINDER_VERSION" ]; then
+    wget -q "https://github.com/projectdiscovery/subfinder/releases/download/${SUBFINDER_VERSION}/subfinder_${SUBFINDER_VERSION#v}_linux_amd64.zip" -O subfinder.zip || true
+    if [ -f subfinder.zip ]; then
+        unzip -o subfinder.zip subfinder || true
+        [ -f subfinder ] && mv subfinder /usr/local/bin/ || true
+        rm -f subfinder.zip
+    fi
+fi
+
+# chisel — Pivoting y túneles TCP/UDP
+echo "[ProtoSec] Instalando chisel..."
+CHISEL_VERSION=$(curl -sL https://api.github.com/repos/jpillora/chisel/releases/latest | grep tag_name | cut -d'"' -f4 || echo "")
+if [ -n "$CHISEL_VERSION" ]; then
+    wget -q "https://github.com/jpillora/chisel/releases/download/${CHISEL_VERSION}/chisel_${CHISEL_VERSION#v}_linux_amd64.gz" -O chisel.gz || true
+    if [ -f chisel.gz ]; then
+        gunzip -f chisel.gz || true
+        [ -f chisel ] && chmod +x chisel && mv chisel /usr/local/bin/ || true
+    fi
+fi
+
+# feroxbuster — Descubrimiento recursivo de archivos y directorios
+echo "[ProtoSec] Instalando feroxbuster..."
+FEROX_VERSION=$(curl -sL https://api.github.com/repos/epi052/feroxbuster/releases/latest | grep tag_name | cut -d'"' -f4 || echo "")
+if [ -n "$FEROX_VERSION" ]; then
+    wget -q "https://github.com/epi052/feroxbuster/releases/download/${FEROX_VERSION}/feroxbuster_amd64.deb.zip" -O feroxbuster.zip || true
+    if [ -f feroxbuster.zip ]; then
+        unzip -o feroxbuster.zip || true
+        dpkg -i feroxbuster*.deb 2>/dev/null || apt-get install -f -y || true
+        rm -f feroxbuster*.deb feroxbuster.zip
+    fi
+fi
+
+# =====================================================================
+# SECCIÓN 4: Metasploit Framework
+# =====================================================================
+echo "[ProtoSec] Instalando Metasploit Framework..."
+curl -sL https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb > /tmp/msfinstall || true
+if [ -f /tmp/msfinstall ]; then
+    chmod 755 /tmp/msfinstall
+    /tmp/msfinstall || echo "[AVISO] La instalación automática de Metasploit falló."
+    rm -f /tmp/msfinstall
+fi
+
+# =====================================================================
+# SECCIÓN 5: Burp Suite Community Edition
+# =====================================================================
+echo "[ProtoSec] Preparando instalador de Burp Suite..."
+cat > /usr/local/bin/instalar-burpsuite << 'BURPEOF'
+#!/bin/bash
+# Script de instalación para Burp Suite Community Edition
+echo "=================================================="
+echo "   Instalador de Burp Suite Community Edition     "
+echo "=================================================="
+echo ""
+echo "Burp Suite requiere descarga manual debido a términos de licencia."
+echo "Puedes descargar la última versión para Linux (.sh) desde:"
+echo "  https://portswigger.net/burp/releases/community/latest"
+echo ""
+echo "Una vez descargada en tu carpeta de Descargas, ejecútala con:"
+echo "  chmod +x burpsuite_community_linux_*.sh"
+echo "  sudo ./burpsuite_community_linux_*.sh"
+echo ""
+BURPEOF
+chmod +x /usr/local/bin/instalar-burpsuite
+
+# =====================================================================
+# SECCIÓN 6: OWASP ZAP (Zaproxy)
+# =====================================================================
+echo "[ProtoSec] Instalando OWASP ZAP..."
+ZAP_VERSION=$(curl -sL https://api.github.com/repos/zaproxy/zaproxy/releases/latest | grep tag_name | cut -d'"' -f4 || echo "")
+if [ -n "$ZAP_VERSION" ]; then
+    wget -q "https://github.com/zaproxy/zaproxy/releases/download/${ZAP_VERSION}/ZAP_${ZAP_VERSION#v}_Linux.tar.gz" -O zap.tar.gz || true
+    if [ -f zap.tar.gz ]; then
+        mkdir -p /opt
+        tar xzf zap.tar.gz -C /opt/ || true
+        ln -sf /opt/ZAP*/zap.sh /usr/local/bin/zaproxy || true
+        rm -f zap.tar.gz
+    fi
+fi
+
+# =====================================================================
+# SECCIÓN 7: Ghidra (NSA Software Reverse Engineering)
+# =====================================================================
+echo "[ProtoSec] Instalando Ghidra..."
+apt-get install -y default-jdk --no-install-recommends || true
+GHIDRA_URL=$(curl -sL https://api.github.com/repos/NationalSecurityAgency/ghidra/releases/latest | grep browser_download_url | grep '.zip' | head -1 | cut -d'"' -f4 || echo "")
+if [ -n "$GHIDRA_URL" ]; then
+    wget -q "$GHIDRA_URL" -O ghidra.zip || true
+    if [ -f ghidra.zip ]; then
+        mkdir -p /opt
+        unzip -o ghidra.zip -d /opt/ || true
+        ln -sf /opt/ghidra*/ghidraRun /usr/local/bin/ghidra || true
+        rm -f ghidra.zip
+    fi
+fi
+
+# =====================================================================
+# SECCIÓN 8: Radare2 (Compilado de fuentes)
+# =====================================================================
+echo "[ProtoSec] Instalando radare2 desde fuentes..."
+if ! command -v r2 &>/dev/null; then
+    git clone --depth=1 https://github.com/radareorg/radare2.git /tmp/radare2-src || true
+    if [ -d /tmp/radare2-src ]; then
+        cd /tmp/radare2-src
+        sys/install.sh || echo "[AVISO] La compilación de radare2 falló."
+        cd /tmp/protosec-install
+        rm -rf /tmp/radare2-src
+    fi
+fi
+
+# =====================================================================
+# SECCIÓN 9: Social-Engineer Toolkit (SET)
+# =====================================================================
+echo "[ProtoSec] Instalando Social-Engineer Toolkit (SET)..."
+git clone --depth=1 https://github.com/trustedsec/social-engineer-toolkit.git /opt/set || true
+if [ -d /opt/set ]; then
+    cd /opt/set
+    pip3 install --break-system-packages -r requirements.txt || true
+    python3 setup.py install || true
+    cd /tmp/protosec-install
+fi
+
+# =====================================================================
+# SECCIÓN 10: Ligolo-ng
+# =====================================================================
+echo "[ProtoSec] Instalando ligolo-ng..."
+LIGOLO_VERSION=$(curl -sL https://api.github.com/repos/nicocha30/ligolo-ng/releases/latest | grep tag_name | cut -d'"' -f4 || echo "")
+if [ -n "$LIGOLO_VERSION" ]; then
+    wget -q "https://github.com/nicocha30/ligolo-ng/releases/download/${LIGOLO_VERSION}/ligolo-ng_proxy_${LIGOLO_VERSION#v}_linux_amd64.tar.gz" -O ligolo-proxy.tar.gz || true
+    wget -q "https://github.com/nicocha30/ligolo-ng/releases/download/${LIGOLO_VERSION}/ligolo-ng_agent_${LIGOLO_VERSION#v}_linux_amd64.tar.gz" -O ligolo-agent.tar.gz || true
+    
+    if [ -f ligolo-proxy.tar.gz ]; then
+        tar xzf ligolo-proxy.tar.gz -C /tmp/ || true
+        [ -f /tmp/ligolo-ng ] && mv /tmp/ligolo-ng /usr/local/bin/ligolo-proxy || true
+    fi
+    if [ -f ligolo-agent.tar.gz ]; then
+        tar xzf ligolo-agent.tar.gz -C /tmp/ || true
+        [ -f /tmp/ligolo-ng ] && mv /tmp/ligolo-ng /usr/local/bin/ligolo-agent || true
+    fi
+    rm -f ligolo-*.tar.gz
+fi
+
+# =====================================================================
+# SECCIÓN 11: PowerShell
+# =====================================================================
+echo "[ProtoSec] Instalando PowerShell..."
+wget -q https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -O /tmp/ms-prod.deb || true
+if [ -f /tmp/ms-prod.deb ]; then
+    dpkg -i /tmp/ms-prod.deb || true
+    apt-get update -qy || true
+    apt-get install -y powershell --no-install-recommends || echo "[AVISO] Falló la instalación de PowerShell."
+    rm -f /tmp/ms-prod.deb
+fi
+
+# =====================================================================
+# SECCIÓN 12: Bettercap
+# =====================================================================
+echo "[ProtoSec] Instalando Bettercap..."
+BETTERCAP_VERSION=$(curl -sL https://api.github.com/repos/bettercap/bettercap/releases/latest | grep tag_name | cut -d'"' -f4 || echo "")
+if [ -n "$BETTERCAP_VERSION" ]; then
+    wget -q "https://github.com/bettercap/bettercap/releases/download/${BETTERCAP_VERSION}/bettercap_linux_amd64_${BETTERCAP_VERSION#v}.zip" -O bettercap.zip || true
+    if [ -f bettercap.zip ]; then
+        unzip -o bettercap.zip bettercap || true
+        [ -f bettercap ] && mv bettercap /usr/local/bin/ && chmod +x /usr/local/bin/bettercap || true
+        rm -f bettercap.zip
+    fi
+fi
+
+# =====================================================================
+# SECCIÓN 13: PhoneInfoga (OSINT de Teléfonos)
+# =====================================================================
+echo "[ProtoSec] Instalando PhoneInfoga..."
+PHONEINFO_VERSION=$(curl -sL https://api.github.com/repos/sundowndev/phoneinfoga/releases/latest | grep tag_name | cut -d'"' -f4 || echo "")
+if [ -n "$PHONEINFO_VERSION" ]; then
+    wget -q "https://github.com/sundowndev/phoneinfoga/releases/download/${PHONEINFO_VERSION}/phoneinfoga_Linux_x86_64.tar.gz" -O phoneinfoga.tar.gz || true
+    if [ -f phoneinfoga.tar.gz ]; then
+        tar xzf phoneinfoga.tar.gz phoneinfoga || true
+        [ -f phoneinfoga ] && mv phoneinfoga /usr/local/bin/ || true
+        rm -f phoneinfoga.tar.gz
+    fi
+fi
+
+# =====================================================================
+# SECCIÓN 14: Wordlists (rockyou y SecLists)
+# =====================================================================
+echo "[ProtoSec] Descargando y configurando diccionarios (wordlists)..."
+mkdir -p /usr/share/wordlists
+
+# rockyou.txt
+echo "[ProtoSec] Descargando rockyou.txt..."
+wget -q "https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt" -O /usr/share/wordlists/rockyou.txt || true
+
+# SecLists (Clonación shallow para ahorrar espacio)
+echo "[ProtoSec] Clonando SecLists..."
+git clone --depth=1 https://github.com/danielmiessler/SecLists.git /usr/share/wordlists/SecLists || true
+
+# =====================================================================
+# SECCIÓN 15: searchsploit (exploit-db)
+# =====================================================================
+echo "[ProtoSec] Configurando searchsploit (Exploit-DB)..."
+git clone --depth=1 https://github.com/offensive-security/exploitdb.git /opt/exploitdb || true
+if [ -d /opt/exploitdb ]; then
+    ln -sf /opt/exploitdb/searchsploit /usr/local/bin/searchsploit
+    cp /opt/exploitdb/.searchsploit_rc /etc/skel/.searchsploit_rc || true
+fi
+
+# =====================================================================
+# SECCIÓN 16: Maltego CE
+# =====================================================================
+echo "[ProtoSec] Preparando instalador de Maltego CE..."
+cat > /usr/local/bin/instalar-maltego << 'MALTEOF'
+#!/bin/bash
+# Script de preparación para Maltego Community Edition
+echo "=================================================="
+echo "     Instalador de Maltego Community Edition      "
+echo "=================================================="
+echo ""
+echo "Maltego CE requiere descargar el paquete .deb oficial."
+echo "Descárgalo desde: https://www.maltego.com/downloads/"
+echo "Y luego instálalo en el sistema con:"
+echo "  sudo dpkg -i maltego_*.deb"
+echo "  sudo apt-get install -f -y"
+echo ""
+MALTEOF
+chmod +x /usr/local/bin/instalar-maltego
+
+# =====================================================================
+# LIMPIEZA FINAL
+# =====================================================================
+echo "[ProtoSec] Limpiando archivos temporales..."
+rm -rf /tmp/protosec-install
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+
+echo "[ProtoSec] Hook 0030 completado exitosamente."

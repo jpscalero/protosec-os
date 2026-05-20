@@ -1,0 +1,93 @@
+#!/bin/bash
+# =====================================================================
+# ProtoSec OS 1.0 — Hook 0020: Configuración de KDE Plasma y SDDM
+# =====================================================================
+# Este hook configura el aspecto visual de la distribución:
+#   1. Asegura permisos de los archivos de configuración en /etc/skel
+#   2. Instala dependencias y genera el fondo de pantalla personalizado
+#   3. Configura SDDM y su tema visual
+#   4. Modifica las entradas del menú de aplicaciones para ProtoSec
+# =====================================================================
+
+set -e
+
+echo "[ProtoSec] Iniciando Hook 0020 — Configuración del Entorno Visual..."
+
+# --- 1. Generación del Fondo de Pantalla ProtoSec ---
+echo "[ProtoSec] Generando fondo de pantalla estilo Matrix..."
+mkdir -p /usr/share/backgrounds
+
+# Instalar Pillow si no está instalado (se necesita para el script)
+if ! dpkg -s python3-pil &>/dev/null; then
+    echo "[ProtoSec] Instalando python3-pil temporalmente para generar el fondo de pantalla..."
+    apt-get update -qy && apt-get install -y --no-install-recommends python3-pil
+fi
+
+if [ -f /usr/share/protosec/generate-wallpaper.py ]; then
+    python3 /usr/share/protosec/generate-wallpaper.py || echo "[AVISO] Falló la generación del fondo de pantalla con Python. Usando fallback básico."
+else
+    echo "[AVISO] No se encontró el script de generación de wallpaper."
+fi
+
+# --- 2. Permisos del tema SDDM ---
+echo "[ProtoSec] Ajustando permisos de SDDM..."
+chmod -R 755 /usr/share/sddm/themes/protosec
+
+# Asegurar que SDDM use el tema protosec
+mkdir -p /etc/sddm.conf.d
+cat > /etc/sddm.conf << 'EOF'
+[Theme]
+Current=protosec
+CursorTheme=Breeze_Snow
+EOF
+
+# --- 3. Asegurar la propiedad y permisos de /etc/skel ---
+echo "[ProtoSec] Asegurando permisos en /etc/skel..."
+# Todo en etc/skel debe pertenecer a root y tener los permisos correctos antes de copiarse en los directorios de usuario
+find /etc/skel -type d -exec chmod 755 {} \;
+find /etc/skel -type f -exec chmod 644 {} \;
+
+# --- 4. Configurar categorías del Menú de Aplicaciones ---
+echo "[ProtoSec] Organizando el menú de aplicaciones de ProtoSec..."
+mkdir -p /etc/xdg/menus/applications-merged
+
+cat > /etc/xdg/menus/applications-merged/protosec.menu << 'EOF'
+<!DOCTYPE Menu PUBLIC "-//freedesktop//DTD Menu 1.0//EN"
+ "http://www.freedesktop.org/standards/menu-spec/1.0/menu.dtd">
+<Menu>
+  <Name>Applications</Name>
+  <Menu>
+    <Name>ProtoSec Tools</Name>
+    <Directory>protosec.directory</Directory>
+    <Include>
+      <Category>ProtoSec-Pentesting</Category>
+      <Category>ProtoSec-Databases</Category>
+      <Category>ProtoSec-Server</Category>
+    </Include>
+  </Menu>
+</Menu>
+EOF
+
+mkdir -p /usr/share/desktop-directories
+cat > /usr/share/desktop-directories/protosec.directory << 'EOF'
+[Desktop Entry]
+Type=Directory
+Name=ProtoSec OS
+Comment=Herramientas y utilidades de ProtoSec OS
+Icon=utilities-terminal
+EOF
+
+# Hacer ejecutables los scripts de ProtoSec en /usr/bin/
+echo "[ProtoSec] Asegurando permisos de ejecución para scripts en /usr/bin/..."
+for script in protosec-update protosec-tools protosec-setup; do
+    if [ -f "/usr/bin/${script}" ]; then
+        chmod +x "/usr/bin/${script}"
+    fi
+done
+
+# Hacer ejecutable el lanzador del menú
+if [ -f /usr/share/applications/protosec-tools.desktop ]; then
+    chmod +x /usr/share/applications/protosec-tools.desktop
+fi
+
+echo "[ProtoSec] Hook 0020 completado exitosamente."
