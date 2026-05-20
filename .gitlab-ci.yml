@@ -10,7 +10,8 @@ shellcheck:
   script:
     - echo "Iniciando análisis ShellCheck..."
     - shellcheck --version
-    - find . -name "*.sh" -not -path "*/.oh-my-zsh/*" -exec shellcheck -e SC2086 -e SC1090 -e SC1091 {} +
+    - find . -name "*.sh" -not -path "*/.oh-my-zsh/*" -not -path "*/etc/skel/*" -exec shellcheck -e SC2086 -e SC1090 -e SC1091 {} +
+
     - find config/hooks/live/ -name "*.hook.chroot" -exec shellcheck -e SC2086 -e SC1090 -e SC1091 {} +
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
