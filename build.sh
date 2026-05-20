@@ -20,7 +20,6 @@ VERDE='\033[0;32m'
 ROJO='\033[0;31m'
 AMARILLO='\033[1;33m'
 CYAN='\033[0;36m'
-NEGRITA='\033[1m'
 RESET='\033[0m'
 
 # --- Directorio del proyecto ---
@@ -30,7 +29,8 @@ NOMBRE_ISO="ProtoSec-1.0-amd64.iso"
 
 # --- Función para registrar mensajes con marca de tiempo ---
 registrar() {
-    local mensaje="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    local mensaje
+    mensaje="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
     echo -e "${mensaje}" | tee -a "${ARCHIVO_LOG}"
 }
 
@@ -166,9 +166,11 @@ construir_iso() {
     registrar "${AMARILLO}[AVISO] Tiempo estimado: 30-90 minutos dependiendo del hardware e internet.${RESET}"
     cd "${DIR_PROYECTO}"
 
-    local inicio=$(date +%s)
+    local inicio
+    inicio=$(date +%s)
     lb build 2>&1 | tee -a "${ARCHIVO_LOG}" || error_salir "Falló la construcción de la ISO (lb build)."
-    local fin=$(date +%s)
+    local fin
+    fin=$(date +%s)
     local duracion=$((fin - inicio))
     local minutos=$((duracion / 60))
     local segundos=$((duracion % 60))
@@ -203,11 +205,13 @@ finalizar_iso() {
     # Calcular hash SHA256
     registrar "${CYAN}[INFO] Calculando hash SHA256...${RESET}"
     sha256sum "${NOMBRE_ISO}" > "${NOMBRE_ISO}.sha256"
-    local hash=$(cat "${NOMBRE_ISO}.sha256")
+    local hash
+    hash=$(cat "${NOMBRE_ISO}.sha256")
     registrar "${VERDE}[OK] SHA256: ${hash}${RESET}"
 
     # Obtener tamaño de la ISO
-    local tamano=$(du -h "${NOMBRE_ISO}" | cut -f1)
+    local tamano
+    tamano=$(du -h "${NOMBRE_ISO}" | cut -f1)
     registrar "${VERDE}[OK] Tamaño de la ISO: ${tamano}${RESET}"
 }
 
@@ -215,8 +219,10 @@ finalizar_iso() {
 # 8. RESUMEN FINAL
 # =====================================================================
 mostrar_resumen() {
-    local tamano=$(du -h "${NOMBRE_ISO}" 2>/dev/null | cut -f1 || echo "N/A")
-    local hash=$(cut -d' ' -f1 "${NOMBRE_ISO}.sha256" 2>/dev/null || echo "N/A")
+    local tamano
+    tamano=$(du -h "${NOMBRE_ISO}" 2>/dev/null | cut -f1 || echo "N/A")
+    local hash
+    hash=$(cut -d' ' -f1 "${NOMBRE_ISO}.sha256" 2>/dev/null || echo "N/A")
 
     echo ""
     echo -e "${VERDE}"

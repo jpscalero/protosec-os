@@ -6,7 +6,6 @@
 
 # --- Colores ANSI ---
 VERDE='\e[0;32m'
-VERDE_BOLD='\e[1;32m'
 ROJO='\e[0;31m'
 AMARILLO='\e[1;33m'
 NARANJA='\e[0;33m'
